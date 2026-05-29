@@ -103,6 +103,35 @@ class TestExecutePython:
         resp = bridge.execute_python("print('hello world')")
         assert resp.get("status") == "success"
 
+    def test_execute_python_wraps_script_for_error_capture(self, mock_plugin, plugin_port):
+        """The script sent to the plugin is wrapped in a try/except harness."""
+        import bridge
+        mock_plugin.set_response({
+            "status": "success",
+            "result": {"success": True, "output": "{}", "result": {}},
+        })
+        bridge.execute_python("import unreal\nunreal.boom()")
+        sent = mock_plugin.last_received()
+        wrapped = sent["params"]["script"]
+        assert "__bridge_tb" in wrapped and "_exception" in wrapped
+
+    def test_execute_python_exception_becomes_hard_error(self, mock_plugin, plugin_port):
+        """An _exception record from the wrapper is promoted to status=error + traceback."""
+        import bridge
+        err_json = (
+            '{"success": false, "_exception": true, '
+            '"error": "TypeError: required argument \'sweep\'", '
+            '"traceback": "Traceback (most recent call last): ..."}'
+        )
+        mock_plugin.set_response({
+            "status": "success",
+            "result": {"success": True, "output": f"some log\n{err_json}", "result": None},
+        })
+        resp = bridge.execute_python("actor.set_actor_relative_location(v)")
+        assert resp.get("status") == "error"
+        assert "sweep" in resp.get("error", "")
+        assert resp.get("traceback")
+
 
 class TestReconnect:
     """Bridge must auto-reconnect after a dropped connection."""

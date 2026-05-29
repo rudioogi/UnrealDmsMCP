@@ -249,6 +249,33 @@ def send_command(command: str, params: dict[str, Any] | None = None) -> dict[str
     return get_connection().send_command(command, params)
 
 
+def _wrap_script(script: str) -> str:
+    """
+    Wrap a user script so that any *runtime* exception is reported as structured
+    JSON (with a full traceback) on stdout, instead of the script dying silently
+    before it prints its result.
+
+    The original script is exec'd from a string literal (not textually indented),
+    so multi-line string literals inside it are preserved and traceback line
+    numbers stay meaningful. Our error record carries an "_exception" marker so
+    execute_python can promote it to a hard error rather than a normal result.
+    """
+    src = textwrap.dedent(script)
+    return (
+        "import json as __bridge_json\n"
+        "import traceback as __bridge_tb\n"
+        f"__bridge_src = {src!r}\n"
+        "try:\n"
+        "    exec(compile(__bridge_src, '<mcp-script>', 'exec'), {})\n"
+        "except Exception as __bridge_e:\n"
+        "    print(__bridge_json.dumps({"
+        '"success": False, "_exception": True, '
+        '"error": type(__bridge_e).__name__ + ": " + str(__bridge_e), '
+        '"traceback": __bridge_tb.format_exc()'
+        "}))\n"
+    )
+
+
 def execute_python(script: str, timeout_hint: str = "default") -> dict[str, Any]:
     """
     Run a Python script inside the live Unreal Editor via the execute_python
@@ -256,25 +283,35 @@ def execute_python(script: str, timeout_hint: str = "default") -> dict[str, Any]
         import json; print(json.dumps(result))
     so the bridge can parse the structured return value.
 
-    Returns the parsed JSON dict the script printed, or an error dict.
+    The script is wrapped so that an unhandled exception inside the editor is
+    returned as {"status": "error", "error": "<Type>: <msg>", "traceback": ...}
+    rather than a silent null result.
     """
-    response = send_command("execute_python", {"script": textwrap.dedent(script)})
+    response = send_command("execute_python", {"script": _wrap_script(script)})
     if response.get("status") == "error":
         return response
     # The C++ handler returns {"status":"success","result":{"output":"...","result":{...}}}
     result_obj = response.get("result", {})
     parsed = result_obj.get("result")  # pre-parsed JSON if C++ did it
+    if parsed is None:
+        # Fall back: parse the last JSON line of output (scan from the end).
+        output: str = result_obj.get("output", "")
+        for line in reversed([l.strip() for l in output.splitlines() if l.strip()]):
+            try:
+                parsed = json.loads(line)
+                break
+            except json.JSONDecodeError:
+                continue
+    # A runtime exception from the wrapper → surface as a hard error with traceback.
+    if isinstance(parsed, dict) and parsed.get("_exception"):
+        return {
+            "status": "error",
+            "error": parsed.get("error", "Script raised an exception"),
+            "traceback": parsed.get("traceback", ""),
+        }
     if parsed is not None:
         return {"status": "success", "result": parsed}
-    # Fall back: parse the last non-empty line of output as JSON
-    output: str = result_obj.get("output", "")
-    lines = [l.strip() for l in output.splitlines() if l.strip()]
-    if lines:
-        try:
-            return {"status": "success", "result": json.loads(lines[-1])}
-        except json.JSONDecodeError:
-            pass
-    return {"status": "success", "result": None, "output": output}
+    return {"status": "success", "result": None, "output": result_obj.get("output", "")}
 
 
 def not_connected_error() -> dict[str, Any]:
