@@ -127,14 +127,9 @@ inst = unreal.load_asset({repr(instance_path)})
 if inst is None:
     print(json.dumps({{"success": False, "error": "Material instance not found"}}))
 else:
-    param = unreal.ScalarParameterValue()
-    param.set_editor_property("parameter_info", unreal.MaterialParameterInfo(name={repr(param_name)}))
-    param.set_editor_property("parameter_value", float({value}))
-    existing = list(inst.get_editor_property("scalar_parameter_values"))
-    existing = [p for p in existing if str(p.parameter_info.name) != {repr(param_name)}]
-    existing.append(param)
-    inst.set_editor_property("scalar_parameter_values", existing)
-    unreal.EditorAssetLibrary.save_asset({repr(instance_path)})
+    unreal.MaterialEditingLibrary.set_material_instance_scalar_parameter_value(inst, {repr(param_name)}, float({value}))
+    unreal.MaterialEditingLibrary.update_material_instance(inst)
+    unreal.EditorAssetLibrary.save_loaded_asset(inst)
     print(json.dumps({{"success": True}}))
 """
         return bridge.execute_python(script)
@@ -155,14 +150,9 @@ inst = unreal.load_asset({repr(instance_path)})
 if inst is None:
     print(json.dumps({{"success": False, "error": "Material instance not found"}}))
 else:
-    param = unreal.VectorParameterValue()
-    param.set_editor_property("parameter_info", unreal.MaterialParameterInfo(name={repr(param_name)}))
-    param.set_editor_property("parameter_value", unreal.LinearColor({r}, {g}, {b}, {a}))
-    existing = list(inst.get_editor_property("vector_parameter_values"))
-    existing = [p for p in existing if str(p.parameter_info.name) != {repr(param_name)}]
-    existing.append(param)
-    inst.set_editor_property("vector_parameter_values", existing)
-    unreal.EditorAssetLibrary.save_asset({repr(instance_path)})
+    unreal.MaterialEditingLibrary.set_material_instance_vector_parameter_value(inst, {repr(param_name)}, unreal.LinearColor({r}, {g}, {b}, {a}))
+    unreal.MaterialEditingLibrary.update_material_instance(inst)
+    unreal.EditorAssetLibrary.save_loaded_asset(inst)
     print(json.dumps({{"success": True}}))
 """
         return bridge.execute_python(script)
@@ -179,14 +169,9 @@ tex = unreal.load_asset({repr(texture_path)})
 if inst is None or tex is None:
     print(json.dumps({{"success": False, "error": "Asset not found"}}))
 else:
-    param = unreal.TextureParameterValue()
-    param.set_editor_property("parameter_info", unreal.MaterialParameterInfo(name={repr(param_name)}))
-    param.set_editor_property("parameter_value", tex)
-    existing = list(inst.get_editor_property("texture_parameter_values"))
-    existing = [p for p in existing if str(p.parameter_info.name) != {repr(param_name)}]
-    existing.append(param)
-    inst.set_editor_property("texture_parameter_values", existing)
-    unreal.EditorAssetLibrary.save_asset({repr(instance_path)})
+    unreal.MaterialEditingLibrary.set_material_instance_texture_parameter_value(inst, {repr(param_name)}, tex)
+    unreal.MaterialEditingLibrary.update_material_instance(inst)
+    unreal.EditorAssetLibrary.save_loaded_asset(inst)
     print(json.dumps({{"success": True}}))
 """
         return bridge.execute_python(script)

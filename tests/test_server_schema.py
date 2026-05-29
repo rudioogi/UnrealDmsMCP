@@ -51,6 +51,8 @@ class TestToolRegistration:
         # capture
         "export_face_landmarks", "take_screenshot", "run_capture_batch",
         "export_ground_truth_labels",
+        # new in this pass
+        "line_trace", "snap_actor_to_floor",
     }
 
     def test_all_required_tools_registered(self):

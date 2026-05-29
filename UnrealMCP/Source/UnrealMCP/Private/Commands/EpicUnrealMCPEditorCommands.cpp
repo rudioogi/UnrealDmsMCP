@@ -7,6 +7,8 @@
 #include "HighResScreenshot.h"
 #include "Engine/GameViewportClient.h"
 #include "Misc/FileHelper.h"
+#include "HAL/FileManager.h"
+#include "Misc/Paths.h"
 #include "GameFramework/Actor.h"
 #include "Engine/Selection.h"
 #include "Kismet/GameplayStatics.h"
@@ -55,7 +57,11 @@ TSharedPtr<FJsonObject> FEpicUnrealMCPEditorCommands::HandleCommand(const FStrin
     {
         return HandleSpawnBlueprintActor(Params);
     }
-    
+    else if (CommandType == TEXT("take_viewport_screenshot"))
+    {
+        return HandleTakeViewportScreenshot(Params);
+    }
+
     return FEpicUnrealMCPCommonUtils::CreateErrorResponse(FString::Printf(TEXT("Unknown editor command: %s"), *CommandType));
 }
 
@@ -305,4 +311,75 @@ TSharedPtr<FJsonObject> FEpicUnrealMCPEditorCommands::HandleSpawnBlueprintActor(
     // This function will now correctly call the implementation in BlueprintCommands
     FEpicUnrealMCPBlueprintCommands BlueprintCommands;
     return BlueprintCommands.HandleCommand(TEXT("spawn_blueprint_actor"), Params);
+}
+
+TSharedPtr<FJsonObject> FEpicUnrealMCPEditorCommands::HandleTakeViewportScreenshot(const TSharedPtr<FJsonObject>& Params)
+{
+    FString OutputPath;
+    if (!Params->TryGetStringField(TEXT("output_path"), OutputPath))
+    {
+        return FEpicUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'output_path' parameter"));
+    }
+
+    // Prefer a level editor viewport so material/BP editor viewports don't interfere
+    FViewport* Viewport = nullptr;
+    for (FLevelEditorViewportClient* VC : GEditor->LevelViewportClients)
+    {
+        if (VC && VC->Viewport)
+        {
+            Viewport = VC->Viewport;
+            break;
+        }
+    }
+    // Fallback to whatever viewport is currently active
+    if (!Viewport)
+    {
+        Viewport = GEditor->GetActiveViewport();
+    }
+    if (!Viewport)
+    {
+        return FEpicUnrealMCPCommonUtils::CreateErrorResponse(
+            TEXT("No active viewport found. Ensure the Level Editor viewport is open and focused."));
+    }
+
+    // Force a fresh render of the current scene state, then read pixels synchronously.
+    // This bypasses the async AutomationLibrary path and always returns the current frame.
+    Viewport->Draw();
+
+    TArray<FColor> Bitmap;
+    if (!Viewport->ReadPixels(Bitmap))
+    {
+        return FEpicUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Failed to read viewport pixels"));
+    }
+
+    // ReadPixels commonly yields A=0 on the backbuffer → PNG would be fully transparent
+    for (FColor& C : Bitmap)
+    {
+        C.A = 255;
+    }
+
+    FIntPoint Size = Viewport->GetSizeXY();
+    if (Size.X == 0 || Size.Y == 0)
+    {
+        return FEpicUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Viewport has zero size"));
+    }
+
+    // Ensure output directory exists
+    IFileManager::Get().MakeDirectory(*FPaths::GetPath(OutputPath), /*Tree=*/true);
+
+    TArray<uint8> PngData;
+    FImageUtils::CompressImageArray(Size.X, Size.Y, Bitmap, PngData);
+
+    if (!FFileHelper::SaveArrayToFile(PngData, *OutputPath))
+    {
+        return FEpicUnrealMCPCommonUtils::CreateErrorResponse(
+            FString::Printf(TEXT("Failed to write screenshot to: %s"), *OutputPath));
+    }
+
+    TSharedPtr<FJsonObject> Result = MakeShared<FJsonObject>();
+    Result->SetBoolField(TEXT("success"), true);
+    Result->SetStringField(TEXT("path"), OutputPath);
+    Result->SetNumberField(TEXT("width"), Size.X);
+    Result->SetNumberField(TEXT("height"), Size.Y);
+    return Result;
 }

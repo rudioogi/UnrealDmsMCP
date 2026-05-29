@@ -30,17 +30,22 @@ def register(mcp: FastMCP):
 
     @mcp.tool()
     def spawn_actor(
-        name: str,
+        name: str = None,
         actor_type: str = "StaticMeshActor",
         location: list[float] = None,
         rotation: list[float] = None,
         scale: list[float] = None,
         static_mesh: str = "/Engine/BasicShapes/Cube.Cube",
+        actor_name: str = None,
     ) -> dict[str, Any]:
         """
         Spawn an actor in the current level.
         actor_type: UClass name (e.g. 'StaticMeshActor', 'PointLight', 'CameraActor').
+        Accepts 'name' or 'actor_name' interchangeably.
         """
+        name = name or actor_name
+        if not name:
+            return {"status": "error", "error": "Missing required parameter: 'name'"}
         params: dict[str, Any] = {
             "name": name,
             "type": actor_type,
@@ -52,18 +57,25 @@ def register(mcp: FastMCP):
         return safe_spawn_actor(bridge.get_connection(), params)
 
     @mcp.tool()
-    def delete_actor(name: str) -> dict[str, Any]:
-        """Delete an actor by name."""
+    def delete_actor(name: str = None, actor_name: str = None) -> dict[str, Any]:
+        """Delete an actor by name. Accepts 'name' or 'actor_name' interchangeably."""
+        name = name or actor_name
+        if not name:
+            return {"status": "error", "error": "Missing required parameter: 'name'"}
         return safe_delete_actor(bridge.get_connection(), name)
 
     @mcp.tool()
     def set_actor_transform(
-        name: str,
+        name: str = None,
         location: list[float] = None,
         rotation: list[float] = None,
         scale: list[float] = None,
+        actor_name: str = None,
     ) -> dict[str, Any]:
-        """Set the world transform of an actor (location cm, rotation degrees, scale)."""
+        """Set the world transform of an actor (location cm, rotation degrees, scale). Accepts 'name' or 'actor_name'."""
+        name = name or actor_name
+        if not name:
+            return {"status": "error", "error": "Missing required parameter: 'name'"}
         params: dict[str, Any] = {"name": name}
         if location is not None:
             params["location"] = location
@@ -266,12 +278,102 @@ print(json.dumps({"success": True}))
         return bridge.execute_python(script)
 
     @mcp.tool()
-    def take_viewport_screenshot(output_path: str) -> dict[str, Any]:
-        """Capture a screenshot of the active editor viewport to disk."""
+    def take_viewport_screenshot(
+        output_path: str,
+        width: int = 1920,
+        height: int = 1080,
+    ) -> dict[str, Any]:
+        """
+        Capture the active level editor viewport synchronously to disk.
+        Always reflects the current scene state — use this for visual confirmation after
+        scene changes. The image dimensions match the actual viewport size regardless of
+        the width/height hints.
+        output_path: absolute file path for the PNG.
+        """
+        return bridge.send_command(
+            "take_viewport_screenshot",
+            {"output_path": output_path, "width": width, "height": height},
+        )
+
+    # ─── Editor world geometry ────────────────────────────────────────────────
+
+    @mcp.tool()
+    def line_trace(
+        start: list[float],
+        end: list[float],
+        trace_complex: bool = False,
+    ) -> dict[str, Any]:
+        """
+        Cast a line trace in the editor world and return the first blocking hit.
+        Uses the Visibility trace channel (TraceTypeQuery1 under default project config).
+        start/end: [x, y, z] world coordinates in cm.
+        Returns blocking_hit, location, impact_point, impact_normal, and actor name.
+        """
         script = f"""
 import unreal, json
-unreal.AutomationLibrary.take_high_res_screenshot(1920, 1080, {repr(output_path)})
-print(json.dumps({{"success": True, "path": {repr(output_path)}}}))
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+hit = unreal.SystemLibrary.line_trace_single(
+    world,
+    unreal.Vector(*{repr(start)}),
+    unreal.Vector(*{repr(end)}),
+    unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,
+    {repr(trace_complex)}, [],
+    unreal.DrawDebugTrace.NONE, True,
+)
+if hit and hit.blocking_hit:
+    actor = hit.hit_actor
+    print(json.dumps({{
+        "success": True, "blocking_hit": True,
+        "location": [hit.location.x, hit.location.y, hit.location.z],
+        "impact_point": [hit.impact_point.x, hit.impact_point.y, hit.impact_point.z],
+        "impact_normal": [hit.impact_normal.x, hit.impact_normal.y, hit.impact_normal.z],
+        "actor": actor.get_name() if actor else None,
+    }}))
+else:
+    print(json.dumps({{"success": True, "blocking_hit": False}}))
+"""
+        return bridge.execute_python(script)
+
+    @mcp.tool()
+    def snap_actor_to_floor(
+        actor_name: str,
+        trace_distance: float = 10000.0,
+    ) -> dict[str, Any]:
+        """
+        Move an actor downward until its base rests on the first collision surface below it.
+        Uses a vertical line trace (Visibility channel, trace_complex=True so it hits
+        per-poly collision). Returns the final snapped location or an error if no floor
+        is found within trace_distance cm.
+        """
+        script = f"""
+import unreal, json
+world = unreal.get_editor_subsystem(unreal.UnrealEditorSubsystem).get_editor_world()
+by_name = {{a.get_name(): a for a in unreal.EditorActorSubsystem().get_all_level_actors()}}
+actor = by_name.get({repr(actor_name)})
+if actor is None:
+    print(json.dumps({{"success": False, "error": "Actor not found"}}))
+else:
+    origin, extent = actor.get_actor_bounds(False)
+    dist = {trace_distance}
+    hit = unreal.SystemLibrary.line_trace_single(
+        world,
+        unreal.Vector(origin.x, origin.y, origin.z + dist),
+        unreal.Vector(origin.x, origin.y, origin.z - dist),
+        unreal.TraceTypeQuery.TRACE_TYPE_QUERY1,
+        True, [actor],
+        unreal.DrawDebugTrace.NONE, True,
+    )
+    if hit and hit.blocking_hit:
+        loc = actor.get_actor_location()
+        delta_z = hit.impact_point.z + extent.z - origin.z
+        actor.set_actor_location(unreal.Vector(loc.x, loc.y, loc.z + delta_z), False, False)
+        new_loc = actor.get_actor_location()
+        print(json.dumps({{
+            "success": True,
+            "snapped_to": [new_loc.x, new_loc.y, new_loc.z],
+        }}))
+    else:
+        print(json.dumps({{"success": False, "error": "No floor found within trace distance"}}))
 """
         return bridge.execute_python(script)
 

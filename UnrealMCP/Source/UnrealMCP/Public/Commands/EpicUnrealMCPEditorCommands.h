@@ -25,4 +25,7 @@ private:
 
     // Blueprint actor spawning
     TSharedPtr<FJsonObject> HandleSpawnBlueprintActor(const TSharedPtr<FJsonObject>& Params);
-}; 
+
+    // Synchronous viewport screenshot (Draw + ReadPixels on the game thread)
+    TSharedPtr<FJsonObject> HandleTakeViewportScreenshot(const TSharedPtr<FJsonObject>& Params);
+};

@@ -70,7 +70,10 @@ public class UnrealMCP : ModuleRules
 				{
 					"PropertyEditor",      // For property editing
 					"ToolMenus",           // For editor UI
-					"BlueprintEditorLibrary" // For Blueprint utilities
+					"BlueprintEditorLibrary", // For Blueprint utilities
+					"LevelEditor",         // For level viewport access (synchronous screenshot)
+					"ImageWrapper",        // For PNG compression (FImageUtils::CompressImageArray)
+					"RenderCore",          // For FReadSurfaceDataFlags / render commands
 				}
 			);
 

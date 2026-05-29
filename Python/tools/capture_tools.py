@@ -138,7 +138,9 @@ else:
         height: int = 1080,
     ) -> dict[str, Any]:
         """
-        Take a high-resolution screenshot of the current editor viewport.
+        Take a high-resolution screenshot via AutomationLibrary (async, for DMS data capture).
+        NOTE: For interactive/visual confirmation use take_viewport_screenshot instead —
+        it captures synchronously and always reflects the current scene state.
         output_path: absolute file path for the PNG (e.g. 'C:/DMS_Data/frame_0001.png').
         """
         script = f"""
