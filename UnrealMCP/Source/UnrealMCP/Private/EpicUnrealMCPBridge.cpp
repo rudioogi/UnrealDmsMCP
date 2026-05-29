@@ -50,6 +50,8 @@
 #include "GameFramework/InputSettings.h"
 #include "EditorSubsystem.h"
 #include "Subsystems/EditorActorSubsystem.h"
+#include "Settings/EditorPerformanceSettings.h"
+#include "HAL/IConsoleManager.h"
 // Include our new command handler classes
 #include "Commands/EpicUnrealMCPEditorCommands.h"
 #include "Commands/EpicUnrealMCPBlueprintCommands.h"
@@ -88,6 +90,29 @@ void UEpicUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
     ServerThread = nullptr;
     Port = MCP_SERVER_PORT;
     FIPv4Address::Parse(MCP_SERVER_HOST, ServerAddress);
+
+    // CRITICAL for MCP responsiveness: every command runs on the game thread via
+    // AsyncTask(GameThread) while the socket blocks on Future.Get(). If the editor
+    // throttles its tick when not the foreground window (the default "Use Less CPU
+    // when in Background" setting), those tasks stall — commands then hang for the
+    // full socket timeout while the agent works in another window. Disable throttling
+    // so queued commands are serviced promptly even when the editor is backgrounded.
+    if (UEditorPerformanceSettings* PerfSettings = GetMutableDefault<UEditorPerformanceSettings>())
+    {
+        if (PerfSettings->bThrottleCPUWhenNotForeground)
+        {
+            PerfSettings->bThrottleCPUWhenNotForeground = false;
+            PerfSettings->PostEditChange();
+            PerfSettings->SaveConfig();
+            UE_LOG(LogTemp, Display,
+                TEXT("EpicUnrealMCPBridge: Disabled 'Use Less CPU when in Background' so MCP commands are not throttled when the editor is unfocused."));
+        }
+    }
+    // Belt-and-suspenders: also clear the low-level idle CVar.
+    if (IConsoleVariable* IdleCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
+    {
+        IdleCVar->Set(0, ECVF_SetByCode);
+    }
 
     // Start the server automatically
     StartServer();

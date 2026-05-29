@@ -69,4 +69,5 @@ Expected: Claude calls `get_actors_in_level` and returns the actor list.
 
 - **Connection refused on 55557**: The plugin didn't compile or load. Check the Output Log for `EpicUnrealMCPBridge` messages.
 - **`execute_python` returns "Python not available"**: `PythonScriptPlugin` is not enabled in the project. Add it to the `.uproject` Plugins array.
+- **Commands hang for ~30s–5min then succeed on retry**: The editor was throttling its tick because its window wasn't focused (you were in the terminal/Claude Code). Every command runs on the game thread, so a throttled editor stalls them. The plugin now disables **Editor Preferences → General → Performance → "Use Less CPU when in Background"** automatically on startup (look for the `EpicUnrealMCPBridge: Disabled 'Use Less CPU when in Background'` log line). If you still see stalls, confirm that setting is unchecked and that the editor window is visible (not minimized).
 - **Tool returns error in MCP Inspector**: Run `npx @modelcontextprotocol/inspector uv --directory Python run unreal_dms_mcp_server.py` and check the stdio log.
