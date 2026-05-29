@@ -50,7 +50,7 @@
 #include "GameFramework/InputSettings.h"
 #include "EditorSubsystem.h"
 #include "Subsystems/EditorActorSubsystem.h"
-#include "Settings/EditorPerformanceSettings.h"
+#include "Editor/EditorPerformanceSettings.h"
 #include "HAL/IConsoleManager.h"
 // Include our new command handler classes
 #include "Commands/EpicUnrealMCPEditorCommands.h"
