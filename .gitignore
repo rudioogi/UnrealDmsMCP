@@ -1,0 +1,33 @@
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+.uv/
+dist/
+build/
+*.egg-info/
+uv.lock
+*.log
+
+# Unreal Engine
+Binaries/
+Intermediate/
+DerivedDataCache/
+Saved/
+*.VC.db
+*.opensdf
+*.sdf
+*.suo
+*.xcworkspace
+*.xcodeproj
+.vs/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Test outputs
+.pytest_cache/
+htmlcov/
+.coverage

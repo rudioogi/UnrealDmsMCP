@@ -1,0 +1,29 @@
+[project]
+name = "unreal-dms-mcp"
+version = "0.1.0"
+description = "Unreal Engine MCP server for DMS simulation: vehicles, MetaHumans, animations, and data capture."
+requires-python = ">=3.11,<3.14"
+dependencies = [
+  "mcp[cli]>=1.4.1",
+  "fastmcp>=0.2.0",
+  "pydantic>=2.6.1",
+]
+
+[build-system]
+requires = ["setuptools>=42", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["tools*", "helpers*", "py_scripts*"]
+
+[tool.pytest.ini_options]
+testpaths = ["../tests"]
+markers = [
+  "integration: requires a live Unreal Editor (set UNREAL_MCP_LIVE=1)",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=9.0.3",
+]

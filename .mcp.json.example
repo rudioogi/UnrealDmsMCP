@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "unreal-dms": {
+      "command": "uv",
+      "args": [
+        "--directory",
+        "/ABSOLUTE/PATH/TO/unreal-dms-mcp/Python",
+        "run",
+        "unreal_dms_mcp_server.py"
+      ],
+      "env": {
+        "UNREAL_MCP_HOST": "127.0.0.1",
+        "UNREAL_MCP_PORT": "55557"
+      }
+    }
+  }
+}
