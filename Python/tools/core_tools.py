@@ -141,12 +141,22 @@ parent = by_name.get({repr(parent_actor)})
 if not child or not parent:
     print(json.dumps({{"success": False, "error": "Actor not found"}}))
 else:
-    child.attach_to_actor(parent, unreal.AttachmentTransformRules.KEEP_WORLD_TRANSFORM)
-    if {repr(socket_name)} != "None":
+    socket = {repr(socket_name)}
+    if socket and socket != "None":
         child.attach_to_component(
-            parent.root_component,
-            unreal.AttachmentTransformRules.KEEP_WORLD_TRANSFORM,
-            {repr(socket_name)},
+            parent.root_component, socket,
+            unreal.AttachmentRule.KEEP_WORLD,
+            unreal.AttachmentRule.KEEP_WORLD,
+            unreal.AttachmentRule.KEEP_WORLD,
+            False,
+        )
+    else:
+        child.attach_to_actor(
+            parent, "",
+            unreal.AttachmentRule.KEEP_WORLD,
+            unreal.AttachmentRule.KEEP_WORLD,
+            unreal.AttachmentRule.KEEP_WORLD,
+            False,
         )
     print(json.dumps({{"success": True}}))
 """

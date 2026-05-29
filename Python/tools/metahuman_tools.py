@@ -135,13 +135,13 @@ else:
             mh.get_component_by_class(unreal.SkeletalMeshComponent)
         )
         if face_comp:
-            rules = unreal.AttachmentTransformRules(
+            acc.attach_to_component(
+                face_comp, {repr(socket_name)},
                 unreal.AttachmentRule.SNAP_TO_TARGET,
                 unreal.AttachmentRule.SNAP_TO_TARGET,
-                unreal.AttachmentRule.KEEP_RELATIVE,
-                False
+                unreal.AttachmentRule.KEEP_WORLD,
+                False,
             )
-            acc.attach_to_component(face_comp, rules, {repr(socket_name)})
             acc.set_actor_relative_location(loc)
             acc.set_actor_relative_rotation(rot)
         print(json.dumps({{"success": True, "accessory_actor": acc.get_name()}}))
@@ -230,7 +230,9 @@ else:
     ) -> dict[str, Any]:
         """
         Attach a MetaHuman actor to the driver seat socket on a vehicle actor.
-        Hides the vehicle's default skeletal driver mesh if one exists.
+        If driver_socket does not exist on the vehicle's skeletal mesh, the MetaHuman is
+        attached at the mesh origin (the editor logs a warning). Use location_offset /
+        rotation_offset to fine-tune the seated pose relative to the socket.
         """
         script = f"""
 import unreal, json
@@ -240,23 +242,29 @@ vehicle = by_name.get({repr(vehicle_actor_name)})
 if mh is None or vehicle is None:
     print(json.dumps({{"success": False, "error": "Actor not found"}}))
 else:
-    # Find vehicle skeletal mesh root or socket component
+    # Find the vehicle's skeletal mesh component to attach the driver to
     vehicle_root = vehicle.get_component_by_class(unreal.SkeletalMeshComponent)
-    rules = unreal.AttachmentTransformRules(
-        unreal.AttachmentRule.SNAP_TO_TARGET,
-        unreal.AttachmentRule.SNAP_TO_TARGET,
-        unreal.AttachmentRule.KEEP_RELATIVE,
-        False
-    )
     if vehicle_root:
-        mh.attach_to_component(vehicle_root, rules, {repr(driver_socket)})
+        attached = mh.attach_to_component(
+            vehicle_root, {repr(driver_socket)},
+            unreal.AttachmentRule.SNAP_TO_TARGET,
+            unreal.AttachmentRule.SNAP_TO_TARGET,
+            unreal.AttachmentRule.KEEP_WORLD,
+            False,
+        )
     else:
-        mh.attach_to_actor(vehicle, rules)
+        attached = mh.attach_to_actor(
+            vehicle, "",
+            unreal.AttachmentRule.SNAP_TO_TARGET,
+            unreal.AttachmentRule.SNAP_TO_TARGET,
+            unreal.AttachmentRule.KEEP_WORLD,
+            False,
+        )
     loc = unreal.Vector(*{repr(location_offset or [0, 0, 0])})
     rot = unreal.Rotator(*{repr(rotation_offset or [0, 0, 0])})
     mh.set_actor_relative_location(loc)
     mh.set_actor_relative_rotation(rot)
-    print(json.dumps({{"success": True}}))
+    print(json.dumps({{"success": bool(attached), "attached_to_socket": {repr(driver_socket)} if vehicle_root else None}}))
 """
         return bridge.execute_python(script)
 
