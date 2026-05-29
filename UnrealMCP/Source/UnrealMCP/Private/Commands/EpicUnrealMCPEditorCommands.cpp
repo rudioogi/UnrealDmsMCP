@@ -321,21 +321,7 @@ TSharedPtr<FJsonObject> FEpicUnrealMCPEditorCommands::HandleTakeViewportScreensh
         return FEpicUnrealMCPCommonUtils::CreateErrorResponse(TEXT("Missing 'output_path' parameter"));
     }
 
-    // Prefer a level editor viewport so material/BP editor viewports don't interfere
-    FViewport* Viewport = nullptr;
-    for (FLevelEditorViewportClient* VC : GEditor->LevelViewportClients)
-    {
-        if (VC && VC->Viewport)
-        {
-            Viewport = VC->Viewport;
-            break;
-        }
-    }
-    // Fallback to whatever viewport is currently active
-    if (!Viewport)
-    {
-        Viewport = GEditor->GetActiveViewport();
-    }
+    FViewport* Viewport = GEditor->GetActiveViewport();
     if (!Viewport)
     {
         return FEpicUnrealMCPCommonUtils::CreateErrorResponse(
