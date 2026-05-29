@@ -60,8 +60,10 @@ else:
     if cam_comp:
         cam_comp.set_editor_property("field_of_view", {fov_degrees})
     offset = unreal.Vector(*{repr(location_offset or [0, 0, 0])})
-    cam.set_actor_location(mh.get_actor_location() + offset)
-    cam.set_actor_look_at_location(mh.get_actor_location())
+    cam_loc = mh.get_actor_location() + offset
+    cam.set_actor_location(cam_loc, False, True)
+    look_rot = unreal.MathLibrary.find_look_at_rotation(cam_loc, mh.get_actor_location())
+    cam.set_actor_rotation(look_rot, False)
     print(json.dumps({{"success": True}}))
 """
         return bridge.execute_python(script)

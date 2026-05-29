@@ -142,8 +142,8 @@ else:
                 unreal.AttachmentRule.KEEP_WORLD,
                 False,
             )
-            acc.set_actor_relative_location(loc)
-            acc.set_actor_relative_rotation(rot)
+            acc.set_actor_relative_location(loc, False, True)
+            acc.set_actor_relative_rotation(rot, False, True)
         print(json.dumps({{"success": True, "accessory_actor": acc.get_name()}}))
 """
         return bridge.execute_python(script)
@@ -262,8 +262,8 @@ else:
         )
     loc = unreal.Vector(*{repr(location_offset or [0, 0, 0])})
     rot = unreal.Rotator(*{repr(rotation_offset or [0, 0, 0])})
-    mh.set_actor_relative_location(loc)
-    mh.set_actor_relative_rotation(rot)
+    mh.set_actor_relative_location(loc, False, True)
+    mh.set_actor_relative_rotation(rot, False, True)
     print(json.dumps({{"success": bool(attached), "attached_to_socket": {repr(driver_socket)} if vehicle_root else None}}))
 """
         return bridge.execute_python(script)
