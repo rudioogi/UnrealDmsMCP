@@ -108,10 +108,17 @@ void UEpicUnrealMCPBridge::Initialize(FSubsystemCollectionBase& Collection)
                 TEXT("EpicUnrealMCPBridge: Disabled 'Use Less CPU when in Background' so MCP commands are not throttled when the editor is unfocused."));
         }
     }
-    // Belt-and-suspenders: also clear the low-level idle CVar.
+    // Belt-and-suspenders: also clear the low-level idle CVar...
     if (IConsoleVariable* IdleCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("t.IdleWhenNotForeground")))
     {
         IdleCVar->Set(0, ECVF_SetByCode);
+    }
+    // ...and disable Slate's throttling, which otherwise throttles the engine tick to
+    // keep the UI responsive during interaction — that also stalls our game-thread
+    // command tasks. Disabling it keeps the game thread pumping for socket commands.
+    if (IConsoleVariable* SlateThrottleCVar = IConsoleManager::Get().FindConsoleVariable(TEXT("Slate.bAllowThrottling")))
+    {
+        SlateThrottleCVar->Set(0, ECVF_SetByCode);
     }
 
     // Start the server automatically
